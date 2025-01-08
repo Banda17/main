@@ -1,1 +1,79 @@
+//updating wtt function//
+def get_wtt_time(train_number, station, wtt_data):
+    """Get WTT time and traffic allowance for a specific train and station"""
+    try:
+        if not wtt_data or not station in wtt_data:
+            return '', '0'
+        station_times = wtt_data[station].get('Dep', {}).get('times', {})
+        train_info = station_times.get(str(train_number), {})
+        wtt_time = train_info.get('time', '')
+        traffic_allowance = train_info.get('traffic_allowance', '0')
+        return wtt_time, traffic_allowance
+    except Exception as e:
+        logger.warning(f"Error getting WTT time for train {train_number} at {station}: {str(e)}")
+        return '', '0'
+
+//updating get sheet data function
+def get_sheet_data(client, sheet_id):
+    """Fetch data from Google Sheets and process it."""
+    try:
+        # ... [existing code] ...
+
+        # Add WTT time and traffic allowance, then calculate differences
+        df[['WTT TIME', 'TRAFFIC ALLOWANCE']] = df.apply(
+            lambda row: pd.Series(get_wtt_time(
+                extract_train_number(row['Train Name']),
+                row['Location'],
+                wtt_data
+            )),
+            axis=1
+        )
+
+        # Calculate time differences considering traffic allowance
+        df['Time Difference'] = df.apply(
+            lambda x: calculate_time_difference(x['JUST TIME'], x['WTT TIME'], x['TRAFFIC ALLOWANCE']),
+            axis=1
+        )
+
+        # Add train running status
+        df['Running Status'] = df['Time Difference'].apply(determine_train_status)
+
+        # ... [existing code] ...
+        return df
+    except Exception as e:
+        logger.error(f"Failed to fetch sheet data: {str(e)}")
+        st.error(f"Failed to fetch sheet data: {str(e)}")
+        return None
+//updating caluculate time difference
+def calculate_time_difference(just_time, wtt_time, traffic_allowance):
+    """Calculate time difference in minutes between JUST and WTT times considering traffic allowance."""
+    try:
+        if not just_time or not wtt_time:
+            return "N/A"
+        just = datetime.strptime(just_time, "%H:%M")
+        wtt = datetime.strptime(wtt_time, "%H:%M")
+        allowance = int(traffic_allowance)
+        diff = (just - wtt).total_seconds() / 60 - allowance
+        return f"+{int(diff)}" if diff >= 0 else str(int(diff))
+    except Exception as e:
+        logger.warning(f"Failed to calculate time difference: {str(e)}")
+        return "N/A"
+//json structure for the WTT 79
+{
+    "Station1": {
+        "Dep": {
+            "times": {
+                "12345": {
+                    "time": "10:00",
+                    "traffic_allowance": "15"
+                },
+                "67890": {
+                    "time": "12:00",
+                    "traffic_allowance": "10"
+                }
+            }
+        }
+    },
+}
+
 
